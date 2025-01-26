@@ -4,7 +4,6 @@ import sys
 import argparse
 import tempfile
 import os
-import shutil
 
 logging.basicConfig(
     level=logging.INFO,
