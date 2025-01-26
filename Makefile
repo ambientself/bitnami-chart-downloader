@@ -7,6 +7,6 @@ test:
 		bitnami=https://charts.bitnami.com/bitnami \
 		argo=https://argoproj.github.io/argo-helm \
 		--charts \
-		bitnami/external-dns \
+		bitnami/external-dns:8.7.1 \
 		argo/argo-cd:7.7.15 \
 		--chartmuseum_url http://172.18.133.128:8080

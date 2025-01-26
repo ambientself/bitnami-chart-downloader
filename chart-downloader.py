@@ -2,6 +2,9 @@ import subprocess
 import logging
 import sys
 import argparse
+import tempfile
+import os
+import shutil
 
 logging.basicConfig(
     level=logging.INFO,
@@ -67,11 +70,13 @@ def get_latest_version(repo_name, chart_name):
         logging.error(f"Failed to get latest version for {repo_name}/{chart_name}: {e.stderr}")
         raise
 
-def helm_pull_chart(repo_name, chart_name, version=None):
+def helm_pull_chart(repo_name, chart_name, version=None, temp_dir=None):
     try:
         cmd = ["helm", "pull", f"{repo_name}/{chart_name}"]
         if version:
             cmd.extend(["--version", version])
+        if temp_dir:
+            cmd.extend(["--destination", temp_dir])
         subprocess.run(
             cmd,
             check=True,
@@ -96,15 +101,17 @@ def check_chart_museum(chartmuseum_url):
         logging.error(f"ChartMuseum repository verification failed: {e.stderr}")
         raise
 
-def upload_chart_to_chartmuseum(chart_name, chart_version):
+def upload_chart_to_chartmuseum(chart_name, chart_version, temp_dir=None):
+    chart_file = f"{chart_name}-{chart_version}.tgz"
+    chart_path = os.path.join(temp_dir, chart_file) if temp_dir else chart_file
     try:
         subprocess.run(
-            ["helm", "cm-push", f"{chart_name}-{chart_version}.tgz", "chartmuseum"],
+            ["helm", "cm-push", chart_path, "chartmuseum"],
             check=True,
             capture_output=True,
             text=True
         )
-        logging.info(f"Uploaded: {chart_name}-{chart_version}.tgz to ChartMuseum")
+        logging.info(f"Uploaded: {chart_file} to ChartMuseum")
     except subprocess.CalledProcessError as e:
         logging.error(f"Failed to upload Helm chart {chart_name} to ChartMuseum: {e.stderr}")
         raise
@@ -214,27 +221,32 @@ def main():
 
     helm_repo_update()
 
-    for chart in args.charts:
-        repo, chart_name = chart.split("/", 1)
-        start_version = None
-        if ":" in chart_name:
-            chart_name, start_version = chart_name.split(":", 1)
+    with tempfile.TemporaryDirectory() as temp_dir:
+        logging.info(f"Using temporary directory: {temp_dir}")
+        try:
+            for chart in args.charts:
+                repo, chart_name = chart.split("/", 1)
+                start_version = None
+                if ":" in chart_name:
+                    chart_name, start_version = chart_name.split(":", 1)
 
-        # Get all available versions
-        all_versions = get_all_versions(repo, chart_name)
-        versions_to_process = get_version_range(all_versions, start_version)
+                # Get all available versions
+                all_versions = get_all_versions(repo, chart_name)
+                versions_to_process = get_version_range(all_versions, start_version)
 
-        if not versions_to_process:
-            continue
+                if not versions_to_process:
+                    continue
 
-        for version in versions_to_process:
-            if not check_chartmuseum_version(chart_name, version, args.chartmuseum_url):
-                logging.info(f"Version {version} of {repo}/{chart_name} not found in ChartMuseum - downloading")
-                helm_pull_chart(repo, chart_name, version)
-                upload_chart_to_chartmuseum(chart_name, version)
-                logging.info(f"Uploaded {repo}/{chart_name} version {version} to ChartMuseum")
-            else:
-                logging.info(f"Version {version} of {repo}/{chart_name} already exists in ChartMuseum - skipping")
+                for version in versions_to_process:
+                    if not check_chartmuseum_version(chart_name, version, args.chartmuseum_url):
+                        logging.info(f"Version {version} of {repo}/{chart_name} not found in ChartMuseum - downloading")
+                        helm_pull_chart(repo, chart_name, version, temp_dir)
+                        upload_chart_to_chartmuseum(chart_name, version, temp_dir)
+                        logging.info(f"Uploaded {repo}/{chart_name} version {version} to ChartMuseum")
+                    else:
+                        logging.info(f"Version {version} of {repo}/{chart_name} already exists in ChartMuseum - skipping")
+        finally:
+            logging.info("Cleaning up temporary files")
 
 if __name__ == "__main__":
     main()
