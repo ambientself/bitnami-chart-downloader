@@ -147,7 +147,7 @@ def get_all_versions(repo_name, chart_name):
         logging.error(f"Failed to get versions for {repo_name}/{chart_name}: {e.stderr}")
         raise
 
-def check_chartmuseum_version(chart_name, version, chartmuseum_url):
+def check_chartmuseum_version(chart_name, version):
     try:
         result = subprocess.run(
             ["helm", "search", "repo", "chartmuseum/"+chart_name, "--version", version],
