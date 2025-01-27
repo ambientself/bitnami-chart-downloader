@@ -2,7 +2,7 @@ SHELL := /bin/bash
 
 test:
 	@echo "testing against local chart museum"
-	@python chart-downloader.py \
+	@python chart_sync.py \
 		--repos \
 		bitnami=https://charts.bitnami.com/bitnami \
 		argo=https://argoproj.github.io/argo-helm \
