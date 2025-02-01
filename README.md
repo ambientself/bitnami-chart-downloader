@@ -1,1 +1,1 @@
-# bitnami-chart-downloader
+# helm-chart-downloader
